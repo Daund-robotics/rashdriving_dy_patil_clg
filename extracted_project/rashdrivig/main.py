@@ -123,16 +123,40 @@ def set_speed(data):
     target_speed = speed
     emit("status", {"speed": speed})
 
+# ---------------- TELEGRAM BOT SETUP ----------------
+import requests
+
+BOT_TOKEN = "8366269997:AAG517j7wB5Dsm9XG1BwlPAQOrCnXYLVrFI"
+CHAT_ID = "5866641097"
+
+def send_telegram_msg(msg):
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        data = {"chat_id": CHAT_ID, "text": msg}
+        # Use a timeout to prevent blocking the safety loop for too long
+        requests.post(url, data=data, timeout=3)
+        print(f"📩 Telegram Sent: {msg}")
+    except Exception as e:
+        print(f"❌ Telegram Error: {e}")
+
 # ---------------- BACKGROUND SAFETY LOOP ----------------
 def safety_loop():
     global target_speed
 
     rash_start = None
     prev_key = 0
+    
+    # Flags to prevent spamming Telegram
+    alcohol_alert_sent = False
+    rash_alert_sent = False
 
     while True:
         alcohol = GPIO.input(MQ2_PIN)   # 0 = alcohol detected
         key = GPIO.input(KEY_PIN)       # 1 = key ON
+
+        # -------- KEY START (0 -> 1) --------
+        if prev_key == 0 and key == 1:
+            send_telegram_msg("Car is started 🚗")
 
         # -------- KEY TURNED OFF SUDDENLY --------
         if prev_key == 1 and key == 0:
@@ -151,6 +175,8 @@ def safety_loop():
                 "alcohol": "NO",
                 "rash": "NO"
             })
+            alcohol_alert_sent = False # Reset flag
+            rash_alert_sent = False # Reset flag
             time.sleep(0.3)
             continue
 
@@ -158,6 +184,10 @@ def safety_loop():
 
         # -------- ALCOHOL CHECK --------
         if alcohol == 0:
+            if not alcohol_alert_sent:
+                send_telegram_msg("Driver is drunked 🍺")
+                alcohol_alert_sent = True
+            
             GPIO.output(BUZZER_PIN, 1)
             motor_stop()
             target_speed = 0
@@ -166,6 +196,7 @@ def safety_loop():
             time.sleep(1)
             continue
         else:
+            alcohol_alert_sent = False # Reset when alcohol is clear
             socketio.emit("status", {"alcohol": "NO"})
 
         # -------- READ MPU6050 --------
@@ -187,6 +218,10 @@ def safety_loop():
             socketio.emit("alert", {"msg": "⚠️ RASH DRIVING DETECTED (AI)"})
             socketio.emit("status", {"rash": "YES"})
 
+            if not rash_alert_sent:
+                send_telegram_msg("Rash driving detected ⚠️")
+                rash_alert_sent = True
+
             if rash_start is None:
                 rash_start = time.time()
             elif time.time() - rash_start > 3:
@@ -195,6 +230,7 @@ def safety_loop():
                 rash_start = None
         else:
             rash_start = None
+            rash_alert_sent = False # Reset when driving is normal
             GPIO.output(BUZZER_PIN, 0)
             socketio.emit("status", {"rash": "NO"})
 
