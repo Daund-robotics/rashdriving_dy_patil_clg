@@ -1,0 +1,28 @@
+Rash Driving Detection System - Connection Guide
+=====================================================
+
+Microcontroller: Raspberry Pi (GPIO BCM Numbering used in code)
+
+1. Motors (L298N Motor Driver)
+------------------------------
+- ENA (Left Motor Speed - Enable A): GPIO 12 (Pin 32)
+- IN1 (Left Motor Forward): GPIO 6 (Pin 31)
+- IN2 (Left Motor Backward): GPIO 5 (Pin 29)
+- IN3 (Right Motor Forward): GPIO 13 (Pin 33)
+- IN4 (Right Motor Backward): GPIO 19 (Pin 35)
+- ENB (Right Motor Speed - Enable B): GPIO 18 (Pin 12)
+
+2. Sensors
+----------
+- MQ2 Alcohol Gas Sensor (Digital Output): GPIO 27 (Pin 13)
+- Ignition Key Switch (Digital Input): GPIO 16 (Pin 36)
+  * Note: Pull-down resistor is enabled in code (PUD_DOWN)
+- MPU6050 Accelerometer/Gyroscope (I2C):
+  - SDA (Data): GPIO 2 (Pin 3)
+  - SCL (Clock): GPIO 3 (Pin 5)
+  - VCC: 3.3V (Pin 1 or 17)
+  - GND: Ground (Pin 6, 9, 14, 20, 25, 30, 34, or 39)
+
+3. Actuators / Outputs
+----------------------
+- Buzzer (Active Buzzer): GPIO 20 (Pin 38)

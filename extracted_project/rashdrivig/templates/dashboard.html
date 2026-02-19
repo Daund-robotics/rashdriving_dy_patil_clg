@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Driving - Advanced Telemetry</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-red: #ff003c;
+            --neon-green: #00ff9d;
+            --dark-bg: #0a0b10;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: #e0e0e0;
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .header-font { font-family: 'Orbitron', sans-serif; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+        }
+
+        .status-card {
+            transition: all 0.3s ease;
+        }
+
+        .alert-active {
+            background: rgba(255, 0, 60, 0.2) !important;
+            border: 1px solid var(--neon-red) !important;
+            box-shadow: 0 0 15px var(--neon-red);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        /* Car Animation */
+        .car-container {
+            position: relative;
+            height: 150px;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .car-body {
+            font-size: 60px;
+            filter: drop-shadow(0 0 10px var(--neon-blue));
+            transition: transform 0.1s linear;
+        }
+
+        .road-line {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            height: 2px;
+            background: repeating-linear-gradient(90deg, transparent, transparent 20px, var(--neon-blue) 20px, var(--neon-blue) 40px);
+            animation: drive 0.5s linear infinite;
+            opacity: 0.3;
+        }
+
+        @keyframes drive {
+            from { background-position: 0 0; }
+            to { background-position: -40px 0; }
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        /* Custom Slider Styling */
+        input[type=range] {
+            accent-color: var(--neon-blue);
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- TOP HEADER -->
+    <header class="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-gray-800 pb-6">
+        <div>
+            <h1 class="header-font text-4xl font-bold tracking-widest text-cyan-400">SAFE DRIVING</h1>
+            <p class="text-xs uppercase tracking-[0.3em] text-gray-400">Advanced AI Telemetry System</p>
+        </div>
+        <div class="mt-4 md:mt-0 flex items-center space-x-6">
+            <div id="key-indicator" class="flex items-center space-x-2 px-4 py-2 rounded-full border border-gray-700 bg-gray-900">
+                <div id="key-dot" class="w-3 h-3 rounded-full bg-red-500"></div>
+                <span id="key-text" class="font-bold text-sm">IGNITION OFF</span>
+            </div>
+            <div class="text-right">
+                <span class="block text-[10px] text-gray-500 uppercase">System Status</span>
+                <span class="text-green-400 font-bold">ENCRYPTED LINK</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- LEFT COLUMN: CONTROLS & ANIMATION -->
+        <div class="lg:col-span-4 space-y-6">
+            <!-- Animation Box -->
+            <div class="glass-panel p-6 overflow-hidden relative">
+                <h3 class="header-font text-sm mb-4 text-gray-400">Vehicle Status</h3>
+                <div class="car-container">
+                    <div id="road" class="road-line" style="animation-play-state: paused;"></div>
+                    <div id="car-icon" class="car-body">🏎️</div>
+                </div>
+                <div class="mt-4 text-center">
+                    <span id="car-status-msg" class="text-gray-500 italic">Standby Mode</span>
+                </div>
+            </div>
+
+            <!-- Accelerator Control -->
+            <div class="glass-panel p-6">
+                <h3 class="header-font text-sm mb-6 text-gray-400 uppercase">Accelerator Control</h3>
+                <div class="flex flex-col items-center">
+                    <input type="range" id="speed-slider" min="0" max="100" value="0" class="w-full h-2 rounded-lg cursor-pointer">
+                    <div class="flex justify-between w-full mt-4">
+                        <span class="text-xs text-gray-500">STOP</span>
+                        <span class="text-4xl font-bold text-white header-font" id="speed-display">0</span>
+                        <span class="text-xs text-gray-500">MAX</span>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-2">DUTY CYCLE %</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER COLUMN: SENSOR METRICS -->
+        <div class="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Alcohol Detection -->
+            <div id="alcohol-card" class="glass-panel p-6 flex flex-col justify-between status-card">
+                <div>
+                    <h3 class="header-font text-sm text-gray-400 mb-2">ALCOHOL SENSOR</h3>
+                    <div id="alcohol-value" class="text-3xl font-bold text-green-400">CLEAR</div>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-800 rounded-full h-1.5">
+                        <div id="alcohol-bar" class="bg-green-500 h-1.5 rounded-full" style="width: 5%"></div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-2 uppercase">Real-time Gas PPM Check</p>
+                </div>
+            </div>
+
+            <!-- Accident Detection -->
+            <div id="accident-card" class="glass-panel p-6 flex flex-col justify-between status-card">
+                <div>
+                    <h3 class="header-font text-sm text-gray-400 mb-2 text-right">SAFETY STATUS</h3>
+                    <div id="accident-value" class="text-3xl font-bold text-blue-400 text-right">STABLE</div>
+                </div>
+                <div class="mt-4 text-right">
+                    <span class="px-2 py-1 bg-blue-900/30 text-blue-400 text-[10px] border border-blue-800 rounded">IMPACT MONITOR ACTIVE</span>
+                </div>
+            </div>
+
+            <!-- Rash Driving AI -->
+            <div id="rash-card" class="glass-panel p-6 col-span-1 md:col-span-2 status-card">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="header-font text-sm text-gray-400">DRIVING PATTERN (AI)</h3>
+                        <p id="rash-text" class="text-2xl font-bold text-cyan-400">NORMAL BEHAVIOR</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-500 block">Analysis Engine</span>
+                        <span class="text-xs font-mono text-cyan-500">MPU-6050 v2.1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Analysis Graph -->
+            <div class="glass-panel p-4 col-span-1 md:col-span-2">
+                <h3 class="header-font text-[10px] text-gray-500 mb-2">STABILITY ANALYSIS (MPU6050)</h3>
+                <div class="h-[180px]">
+                    <canvas id="analysisChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: GUIDELINES -->
+        <div class="lg:col-span-3 space-y-4">
+            <div class="glass-panel p-6 h-full">
+                <h3 class="header-font text-sm text-cyan-400 mb-6 border-b border-cyan-900/50 pb-2">SAFETY PROTOCOLS</h3>
+                <ul class="space-y-4 text-sm">
+                    <li class="flex items-start space-x-3">
+                        <span class="text-cyan-500 font-bold">01</span>
+                        <p class="text-gray-400">The vehicle will automatically slow stop if alcohol gas exceeds threshold.</p>
+                    </li>
+                    <li class="flex items-start space-x-3">
+                        <span class="text-cyan-500 font-bold">02</span>
+                        <p class="text-gray-400">Sudden accelerations (>30% in 1s) will trigger the safety buzzer.</p>
+                    </li>
+                    <li class="flex items-start space-x-3">
+                        <span class="text-cyan-500 font-bold">03</span>
+                        <p class="text-gray-400">AI monitors G-Force levels via MPU6050 to detect erratic maneuvers.</p>
+                    </li>
+                    <li class="flex items-start space-x-3">
+                        <span class="text-cyan-500 font-bold">04</span>
+                        <p class="text-gray-400">If the key switch is turned off, the vehicle initiates a linear deceleration.</p>
+                    </li>
+                </ul>
+
+                <div class="mt-12 pt-6 border-t border-gray-800">
+                    <div class="text-[10px] text-gray-600 uppercase tracking-widest mb-2">System Alerts</div>
+                    <div id="log-container" class="h-40 overflow-y-auto text-[11px] font-mono text-gray-500 space-y-1">
+                        <div>> Initializing Dashboard...</div>
+                        <div>> Hardware Link Established...</div>
+                        <div>> Ready for Operation.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ALERT OVERLAY -->
+    <div id="alert-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-red-950 border-2 border-red-500 p-8 rounded-2xl max-w-md w-full text-center">
+            <div class="text-6xl mb-4">⚠️</div>
+            <h2 class="header-font text-2xl text-red-500 font-bold mb-2">CRITICAL ALERT</h2>
+            <p id="alert-msg" class="text-red-200 mb-6 font-bold text-xl uppercase tracking-tighter"></p>
+            <button onclick="closeAlert()" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-colors">ACKNOWLEDGE</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const slider = document.getElementById("speed-slider");
+        const speedDisplay = document.getElementById("speed-display");
+        const carIcon = document.getElementById("car-icon");
+        const road = document.getElementById("road");
+        const alertModal = document.getElementById("alert-modal");
+        const alertMsg = document.getElementById("alert-msg");
+        const logContainer = document.getElementById("log-container");
+
+        // --- CHART SETUP ---
+        const ctx = document.getElementById('analysisChart').getContext('2d');
+        const analysisChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(20).fill(''),
+                datasets: [{
+                    label: 'Stability Index',
+                    data: Array(20).fill(0),
+                    borderColor: '#00f2ff',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: 'rgba(0, 242, 255, 0.1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { display: false, min: -2, max: 2 },
+                    x: { display: false }
+                },
+                animation: false
+            }
+        });
+
+        // --- SPEED SLIDER HANDLER ---
+        slider.addEventListener("input", (e) => {
+            const speed = e.target.value;
+            speedDisplay.innerText = speed;
+            socket.emit("set_speed", { speed: speed });
+        });
+
+        // --- SOCKET UPDATES ---
+        socket.on("status", (data) => {
+            // Ignition Logic
+            if (data.key) {
+                const dot = document.getElementById("key-dot");
+                const txt = document.getElementById("key-text");
+                const carMsg = document.getElementById("car-status-msg");
+
+                if (data.key === "ON") {
+                    dot.classList.replace("bg-red-500", "bg-green-500");
+                    txt.innerText = "IGNITION ON";
+                    txt.classList.add("text-green-400");
+                    carMsg.innerText = "Engine Ready / Driving Mode";
+                } else {
+                    dot.classList.replace("bg-green-500", "bg-red-500");
+                    txt.innerText = "IGNITION OFF";
+                    txt.classList.remove("text-green-400");
+                    carMsg.innerText = "Standby Mode";
+                }
+            }
+
+            // Speed & Animation
+            if (data.speed !== undefined) {
+                speedDisplay.innerText = data.speed;
+                slider.value = data.speed;
+                
+                if (data.speed > 0) {
+                    road.style.animationPlayState = "running";
+                    road.style.animationDuration = (1 / (data.speed / 50)) + "s";
+                    carIcon.style.transform = `translateX(${Math.sin(Date.now()/200)*3}px)`;
+                } else {
+                    road.style.animationPlayState = "paused";
+                }
+            }
+
+            // Alcohol Logic
+            if (data.alcohol) {
+                const card = document.getElementById("alcohol-card");
+                const val = document.getElementById("alcohol-value");
+                const bar = document.getElementById("alcohol-bar");
+
+                if (data.alcohol === "YES") {
+                    card.classList.add("alert-active");
+                    val.innerText = "DRUNK DETECTED";
+                    val.classList.replace("text-green-400", "text-red-500");
+                    bar.style.width = "100%";
+                    bar.classList.replace("bg-green-500", "bg-red-500");
+                } else {
+                    card.classList.remove("alert-active");
+                    val.innerText = "CLEAR";
+                    val.classList.replace("text-red-500", "text-green-400");
+                    bar.style.width = "5%";
+                    bar.classList.replace("bg-red-500", "bg-green-500");
+                }
+            }
+
+            // Rash Logic
+            if (data.rash) {
+                const rashCard = document.getElementById("rash-card");
+                const rashTxt = document.getElementById("rash-text");
+                if (data.rash === "YES") {
+                    rashCard.classList.add("alert-active");
+                    rashTxt.innerText = "RASH DRIVING DETECTED";
+                    rashTxt.classList.replace("text-cyan-400", "text-red-500");
+                } else {
+                    rashCard.classList.remove("alert-active");
+                    rashTxt.innerText = "NORMAL BEHAVIOR";
+                    rashTxt.classList.replace("text-red-500", "text-cyan-400");
+                }
+            }
+
+            // Update Chart with fake volatility for simulation
+            const noise = (Math.random() - 0.5) * 0.5;
+            const currentVal = analysisChart.data.datasets[0].data[19];
+            updateChart(currentVal + noise);
+        });
+
+        socket.on("alert", (data) => {
+            alertMsg.innerText = data.msg;
+            alertModal.classList.remove("hidden");
+            addLog(data.msg);
+        });
+
+        function closeAlert() {
+            alertModal.classList.add("hidden");
+        }
+
+        function updateChart(val) {
+            analysisChart.data.datasets[0].data.shift();
+            analysisChart.data.datasets[0].data.push(val);
+            analysisChart.update();
+        }
+
+        function addLog(msg) {
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement("div");
+            div.innerHTML = `<span class="text-cyan-900">[${time}]</span> ${msg}`;
+            logContainer.prepend(div);
+        }
+
+    </script>
+</body>
+</html>
